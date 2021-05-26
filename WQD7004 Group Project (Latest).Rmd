@@ -13,7 +13,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-\
 
 Recently, computer technology and machine learning techniques are developing software to assist doctors in making decision of heart disease in the early stage. 
 Heart disease prediction system can assist medical professionals in predicting heart disease status based on the clinical data of patients. 
@@ -45,7 +44,6 @@ The dataset consists of 14 features. Features description of the dataset are as 
 |13|thal|3 = normal; 6 = fixed defect; 7 = reversable defect|
 |14|num|the predicted attribute - diagnosis of heart disease (angiographic disease status) (Value 0 = < 50% diameter narrowing; Value 1 = > 50% diameter narrowing)|
 
-\
 
 ## Libraries
 
@@ -182,7 +180,6 @@ From our dataset, we see a fairly balanced dataset where from 303 samples:
 
 However, from CDC fact sheet <https://www.cdc.gov/nchs/fastats/heart-disease.htm>, percentage of adults who have ever been diagnosed with coronary haert disease in the U.S is only 4.6 percent. Although we see a big discrepancies between our dataset and the fact, it will not be a problem for our prediction. It is just something for us to be aware of.
 
-\
 
 ### Numerical Variable Distribution?
 
@@ -253,7 +250,6 @@ grid.arrange(age, rbp, chl, mha, eia, std, mbv, ncol=2, nrow=4)
 
 So above we see how common or uncommon certain categories are. For example, category 1 of Resting ECG is very uncommon. But how does the Condition variable present itself with respect to each of these features? Can we learn anything?
 
-\
 
 ```{r}
 age <- heart_df %>%
@@ -302,7 +298,6 @@ cormat <- cor(heart_df)
 ggcorrplot(cormat, method = "circle")
 ```
 
-\
 
 Assuming that all data are numerical data, the strongest correlation of 0.58 is between ST Depression and ST Slope features. The correlation values with respect to Heart Disease Condition are as below:
 
@@ -311,11 +306,9 @@ Assuming that all data are numerical data, the strongest correlation of 0.58 is 
 * Between 0.2 and 0.3 - Age, Sex
 * Less than 0.2 - Resting ECG, Resting Blood Pressure, Cholesterol, Fasting Blood Sugar
 
-\
 
 ### Important Observations?
 
-\
 
 So far, a few important points has been observed.
 
@@ -352,7 +345,6 @@ So far, a few important points has been observed.
 -  Value 1: having ST-T wave abnormality (T wave inversions and/or ST elevation or depression of > 0.05 mV)
 -  Value 2: showing probable or definite left ventricular hypertrophy by Estes' criteria
 
-\
 
 ## Predictions
 
