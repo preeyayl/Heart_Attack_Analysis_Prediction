@@ -1,0 +1,454 @@
+---
+title: "Heart Disease Analysis and Prediction"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+# {.tabset}
+
+## Introduction
+
+\
+
+Recently, computer technology and machine learning techniques are developing software to assist doctors in making decision of heart disease in the early stage. 
+Heart disease prediction system can assist medical professionals in predicting heart disease status based on the clinical data of patients. 
+
+The main objective of this project is to answer the below research questions:
+
+* Can we predict who will suffer Heart Disease?
+* Can we discover interesting features that affect Heart Disease?
+* Can we start to understand what causes Heart Disease?
+
+For this project, we will utilize Heart Disease dataset taken from <http://archive.ics.uci.edu/ml/datasets/Heart+Disease>. This dataset was donated to _UCI_ on the 1st of July 1988.The name of the dataset is _processed.cleveland.data_. The data was collected from _Cleveland Clinic Foundation_. The principal investigator for the data collection is _Robert Detrano, M.D., Ph.D._ from  _V.A. Medical Center, Long Beach and Cleveland Clinic Foundation_.
+
+The dataset consists of 14 features. Features description of the dataset are as below:
+
+|No.|Features|Description|
+|:- |:- |:- |
+|1|age|age in years|
+|2|sex|sex (1 = male; 0 = female)|
+|3|cp|chest pain type (1 = typical angina; 2 = atypical angina; 3 = non-anginal pain; 4 = asymptomatic)|
+|4|trestbps|resting blood pressure (in mm Hg on admission to the hospital)|
+|5|chol|serum cholestoral in mg/dl|
+|6|fbs|fasting blood sugar > 120 mg/dl (1 = true; 0 = false)|
+|7|restecg|resting electrocardiographic results (0 = normal; 1 = having ST-T; 2 = hypertrophy)|
+|8|thalach|maximum heart rate achieved|
+|9|exang|exercise induced angina (1 = yes; 0 = no)|
+|10|oldpeak|ST depression induced by exercise relative to rest|
+|11|slope|the slope of the peak exercise ST segment (1 = upsloping; 2 = flat; 3 = downsloping)|
+|12|ca|number of major vessels (0-3) colored by flourosopy|
+|13|thal|3 = normal; 6 = fixed defect; 7 = reversable defect|
+|14|num|the predicted attribute - diagnosis of heart disease (angiographic disease status) (Value 0 = < 50% diameter narrowing; Value 1 = > 50% diameter narrowing)|
+
+\
+
+## Libraries
+
+```{r}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+#library(cowplot)
+library(waffle)
+library(ggcorrplot)
+library(caret)
+```
+
+## Data Cleaning
+
+\
+
+First, read the raw data and store it in a data frame.
+
+```{r}
+heart_df <- read.csv("processed.cleveland.data")
+head(heart_df)
+```
+
+\
+
+This dataset does not have columns name. We will rename the columns according to features.
+
+```{r}
+names(heart_df) <- c('Age', 'Sex', 'Chest Pain Type', 'Resting Blood Pressure', 'Cholesterol', 'Fasting Blood Sugar', 'Resting ECG', 'Max. HR Achieved', 'Exercise Induced Angina', 'ST Depression', 'ST Slope', 'Num. Major Blood Vessels', 'Thalassemia', 'Condition')
+head(heart_df)
+```
+
+\
+
+We will check the data for any missing values.
+
+```{r}
+sum(is.na(heart_df))
+summary(heart_df)
+str(heart_df)
+```
+
+\
+
+There is no missing value found. However, we found out that for features _Num. Major Blood Vessels_ and _Thalassemia_, the class is Character although in the feature description, it should be numeric. We need to check the distinct values of these features.
+
+```{r}
+unique(heart_df$`Num. Major Blood Vessels`)
+unique(heart_df$`Thalassemia`)
+```
+
+\
+
+The character values of unknown is denoted by _?_. We will replace the unknown value to median value of the series, and change the class to numeric. (we removed it)
+
+```{r}
+heart_df$`Num. Major Blood Vessels`[heart_df$`Num. Major Blood Vessels` == "?"] <- NA
+heart_df$`Thalassemia`[heart_df$`Thalassemia` == "?"] <- NA
+#heart_df <- heart_df %>%
+  #mutate(`Num. Major Blood Vessels` = replace(`Num. Major Blood Vessels`,is.na(`Num. Major Blood Vessels`),median(`Num. Major Blood Vessels`,na.rm=TRUE)))
+#heart_df <- heart_df %>%
+  #mutate(`Thalassemia` = replace(`Thalassemia`,is.na(`Thalassemia`),median(`Thalassemia`,na.rm=TRUE)))
+#heart_df$`Num. Major Blood Vessels` <- as.numeric(heart_df$`Num. Major Blood Vessels`)
+#heart_df$`Thalassemia` <- as.numeric(heart_df$`Thalassemia`)
+nrow(heart_df)
+heart_df <- heart_df[complete.cases(heart_df),]
+str(heart_df)
+summary(heart_df)
+```
+
+\
+
+Also from feature description, value greater than or equals to 1 in condition feature denotes heart disease. We will change the value to 1.
+
+```{r}
+unique(heart_df$`Condition`)
+heart_df$`Condition`[heart_df$`Condition` == 2] <- 1
+heart_df$`Condition`[heart_df$`Condition` == 3] <- 1
+heart_df$`Condition`[heart_df$`Condition` == 4] <- 1
+unique(heart_df$`Condition`)
+heart_df$Condition <- as.factor(heart_df$Condition)
+```
+
+\
+
+From observation, the features can be classified into numerical and categorical variables as below: 
+
+|No.|Features|Category|
+|:- |:- |:- |
+|1|Age|Numerical|
+|2|Sex|Categorical|
+|3|Chest Pain Type|Categorical|
+|4|Resting Blood Pressure|Numerical|
+|5|Cholesterol|Numerical|
+|6|Fasting Blood Sugar|Categorical|
+|7|Resting ECG|Categorical|
+|8|Max. HR Achieved|Numerical|
+|9|Exercise Induced Angina|Categorical|
+|10|ST Depression|Numerical|
+|11|ST Slope|Categorical|
+|12|Num. Major Blood Vessels|Numerical|
+|13|Thalassemia|Categorical|
+|14|Condition|Categorical|
+
+Our data is now ready for analysis.
+
+
+## Data Exploration and Feature Engineering
+
+### How many have a heart condition in our dataset?
+
+```{r, fig.width=6, fig.align="center"}
+cond <- heart_df %>%
+  ggplot(aes(x=Condition,fill=factor(Condition))) +
+  geom_bar(alpha=0.8) +
+  geom_text(
+    aes(label = sprintf('%s (%.0f%%)', after_stat(count), after_stat(count/sum(count)*100))),
+    stat='count', 
+    vjust = -0.25
+  )
+grid.arrange(cond, ncol=1)
+#waffle(heart_df$Condition/3)
+```
+
+From our dataset, we see a fairly balanced dataset where from 303 samples:
+
+* 54% or 164 samples are with no heart disease condition
+* 46% or 139 samples are with heart disease condition
+
+However, from CDC fact sheet <https://www.cdc.gov/nchs/fastats/heart-disease.htm>, percentage of adults who have ever been diagnosed with coronary haert disease in the U.S is only 4.6 percent. Although we see a big discrepancies between our dataset and the fact, it will not be a problem for our prediction. It is just something for us to be aware of.
+
+\
+
+### Numerical Variable Distribution?
+
+```{r}
+age <- heart_df %>%
+  ggplot(aes(x=`Age`, fill=factor(Condition))) +
+  geom_density(alpha = 0.8)
+rbp <- heart_df %>%
+  ggplot(aes(x=`Resting Blood Pressure`,fill=factor(Condition))) +
+  geom_density(alpha = 0.8)
+chl <- heart_df %>%
+  ggplot(aes(x=`Cholesterol`,fill=factor(Condition))) +
+  geom_density(alpha = 0.8)
+mha <- heart_df %>%
+  ggplot(aes(x=`Max. HR Achieved`,fill=factor(Condition))) +
+  geom_density(alpha = 0.8)
+std <- heart_df %>%
+  ggplot(aes(x=`ST Depression`,fill=factor(Condition))) +
+  geom_density(alpha = 0.8)
+std <- heart_df %>%
+  ggplot(aes(x=`ST Depression`,fill=factor(Condition))) +
+  geom_density(alpha = 0.8)
+mbv <- heart_df %>%
+  ggplot(aes(x=`Num. Major Blood Vessels`,fill=factor(Condition))) +
+  geom_density(alpha = 0.8)
+grid.arrange(age, rbp, chl, mha, std, mbv, ncol=2, nrow=3)
+```
+
+
+We do see some differences between the conditions. In particular the Num. Major Blood Vessels, Age, ST Depression & Max. HR Achieved seem to be very important. We can explore these more later as it does seems like this will be useful for our models. Let's zoom in on two noticeable plots.
+
+```{r fig.width=10}
+grid.arrange(mha, mbv, ncol=2)
+```
+
+It looks like these two variables have a strong impact. They will likely become important features for our model later on.
+
+\
+
+### Categorical Variable Distribution?
+
+```{r}
+age <- heart_df %>%
+  ggplot(aes(x=`Sex`)) +
+  geom_bar(position='dodge',fill="orange",alpha=0.8)
+rbp <- heart_df %>%
+  ggplot(aes(x=`Chest Pain Type`)) +
+  geom_bar(position='dodge',fill="orange",alpha=0.8)
+chl <- heart_df %>%
+  ggplot(aes(x=`Fasting Blood Sugar`)) +
+  geom_bar(position='dodge',fill="orange",alpha=0.8)
+mha <- heart_df %>%
+  ggplot(aes(x=`Resting ECG`)) +
+  geom_bar(position='dodge',fill="orange",alpha=0.8)
+eia <- heart_df %>%
+  ggplot(aes(x=`Exercise Induced Angina`)) +
+  geom_bar(position='dodge',fill="orange",alpha=0.8)
+std <- heart_df %>%
+  ggplot(aes(x=`ST Slope`)) +
+  geom_bar(position='dodge',fill="orange",alpha=0.8)
+mbv <- heart_df %>%
+  ggplot(aes(x=`Thalassemia`)) +
+  geom_bar(position='dodge',fill="orange",alpha=0.8)
+grid.arrange(age, rbp, chl, mha, eia, std, mbv, ncol=2, nrow=4)
+```
+
+So above we see how common or uncommon certain categories are. For example, category 1 of Resting ECG is very uncommon. But how does the Condition variable present itself with respect to each of these features? Can we learn anything?
+
+\
+
+```{r}
+age <- heart_df %>%
+  ggplot(aes(x=`Sex`, fill=factor(Condition))) +
+  geom_bar(position='dodge',alpha=0.8)
+rbp <- heart_df %>%
+  ggplot(aes(x=`Chest Pain Type`,fill=factor(Condition))) +
+  geom_bar(position='dodge',alpha=0.8)
+chl <- heart_df %>%
+  ggplot(aes(x=`Fasting Blood Sugar`,fill=factor(Condition))) +
+  geom_bar(position='dodge',alpha=0.8)
+mha <- heart_df %>%
+  ggplot(aes(x=`Resting ECG`,fill=factor(Condition))) +
+  geom_bar(position='dodge',alpha=0.8)
+eia <- heart_df %>%
+  ggplot(aes(x=`Exercise Induced Angina`,fill=factor(Condition))) +
+  geom_bar(position='dodge',alpha=0.8)
+std <- heart_df %>%
+  ggplot(aes(x=`ST Slope`,fill=factor(Condition))) +
+  geom_bar(position='dodge')
+mbv <- heart_df %>%
+  ggplot(aes(x=`Thalassemia`,fill=factor(Condition))) +
+  geom_bar(position='dodge')
+grid.arrange(age, rbp, chl, mha, eia, std, mbv, ncol=2, nrow=4)
+```
+
+Let's now zoom in to a couple of standout observations.
+
+```{r fig.width=10}
+grid.arrange(rbp, mbv, ncol=2)
+```
+
+Thalassemia and Chest Pain Type values look to be highly indicative of heart disease, and indeed of being lower risk in the case of some values.
+
+\
+
+### How do variables correlate?
+
+```{r}
+#heart_df_num <- heart_df %>%
+#  select("Age","Resting Blood Pressure","Cholesterol","Max. HR Achieved","ST Depression",	#"Num. Major Blood Vessels")
+#heart_df_num
+#cormat <- cor(heart_df_num)
+cormat <- cor(heart_df)
+ggcorrplot(cormat, method = "circle")
+```
+
+\
+
+Assuming that all data are numerical data, the strongest correlation of 0.58 is between ST Depression and ST Slope features. The correlation values with respect to Heart Disease Condition are as below:
+
+* More than 0.4 - Thalassemia, Num. Major Blood Vessels, Exercise Induced Angina, ST Depression, Max. HR Achieved, Chest Pain Type
+* Between 0.3 and 0.4 - ST Slope
+* Between 0.2 and 0.3 - Age, Sex
+* Less than 0.2 - Resting ECG, Resting Blood Pressure, Cholesterol, Fasting Blood Sugar
+
+\
+
+### Important Observations?
+
+\
+
+So far, a few important points has been observed.
+
+* Risk of heart disease increases with _Age_.
+* Rising _Cholesterol_ and _Resting Blood Pressure_ does not appear to be a major indicator of heart disease.
+* A low _Max HR Achieved_ is a big warning sign of heart disease.
+* Rising _ST Depression_ and _Num. Major Blood Vessels_ is an indicator of heart disease.
+* In general, female has fewer heart disease compared to male.
+* _Chest Pain Type_ 4 is a major warning sign of heart disease.
+* _Fasting Blood Sugar_ and _Resting ECG_ shows little correlation to heart disease.
+* _Exercise Induced Angina_ is an indicator of heart disease.
+* Flat _ST Slope_ is a major indicator of heart disease, and the risk is lower for Upsloping _ST Slope_. 
+* _Thalassemia_ of reversable defect type is a major indicator of heart disease. 
+
+\
+
+Predictions
+```{r}
+X = heart_df[,c('Age', 'Sex', 'Chest Pain Type', 'Resting Blood Pressure', 'Cholesterol', 'Fasting Blood Sugar', 'Resting ECG', 'Max. HR Achieved', 'Exercise Induced Angina', 'ST Depression', 'ST Slope', 'Num. Major Blood Vessels', 'Thalassemia')]
+
+y = heart_df[,'Condition']
+
+y_test <- heart_test$Condition
+
+set.seed(1234)
+
+trainIndex <- createDataPartition(heart_df$Condition, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+heart_train <- heart_df[trainIndex,]
+heart_test <- heart_df[-trainIndex,]
+
+
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 10)
+#Gradient boosted model
+
+gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
+                        n.trees = (1:30)*50, 
+                        shrinkage = 0.1,
+                        n.minobsinnode = 20)
+                        
+nrow(gbmGrid)
+
+gbmFit <- train(Condition ~ ., data = heart_train, 
+                 method = "gbm", 
+                 trControl = fitControl, 
+                 verbose = FALSE, 
+                 tuneGrid = gbmGrid)
+gbmFit
+
+pred_gbm <- predict(gbmFit,heart_test)
+
+gbmConf <- confusionMatrix(reference = heart_test$Condition, data = pred_gbm, mode='everything', positive='0')
+
+gbmConf$byClass
+
+#Accuracy : 84.5%
+#Sensitivity: 83.9%
+#Precision: 86.7%
+
+#Random forest
+mtry <- sqrt(ncol(X))
+
+rfGrid <-  expand.grid(mtry = mtry)
+
+rfFit <- train(Condition ~ ., data = heart_train, 
+                 method = "rf", 
+                 trControl = fitControl, 
+                 verbose = FALSE,
+                 tuneGrid = rfGrid)
+rfFit
+
+pred_rf <- predict(rfFit,heart_test)
+
+rfConf <- confusionMatrix(reference = heart_test$Condition, data = pred_rf, mode='everything', positive='0')
+
+rfConf$byClass
+
+#Accuracy: 87.9%
+#Sensitivity: 87.1%
+#Precision: 90.0%
+
+#Boosted Logistic regression
+logitFit <- train(Condition ~ ., data = heart_train, 
+                 method = "LogitBoost", 
+                 trControl = fitControl, 
+                 verbose = FALSE )
+logitFit
+
+pred_logit <- predict(logitFit,heart_test)
+
+logitConf <- confusionMatrix(reference = heart_test$Condition, data = pred_logit, mode='everything', positive='0')
+
+logitConf$byClass
+
+#Accuracy: 79.3%
+#Sensitivity: 77.4%
+#Precision: 82.8%
+
+#Generalized Linear Model 
+glmnetGrid <- expand.grid(alpha = 0:1, lambda = seq(0.0001, 1, length = 100))
+
+glmnetFit <- train(Condition ~ ., data = heart_train, 
+                 method = "glmnet", 
+                 trControl = fitControl, 
+                 verbose = FALSE, tuneGrid = glmnetGrid )
+glmnetFit
+
+pred_glmnet <- predict(glmnetFit,heart_test)
+
+glmConf <- confusionMatrix(reference = heart_test$Condition, data = pred_glmnet, mode='everything', positive='0')
+
+glmConf$byClass
+
+#Accuracy: 86.2%
+#Sensitivity: 87.1%
+#Precision: 87.1%
+
+#Overall results
+model <- c("GBM","RF", "Logit", "GLMnet")
+accuracy <- c(84.5,87.9,79.3,86.2)
+sens <-c(83.9,87.1,77.4,87.1)
+prec <-c(86.7,90.0,82.8,87.1)
+data.frame(model,accuracy,sens,prec)
+
+##Most accurate model: Random Forest
+##Most sensitive model: Random Forest and Generalized Linear Model
+##Most precise model: Random Forest
+
+#Most important variables according to RF
+plot(varImp(rfFit, scale = FALSE))
+
+#As we can see, Chest Pain Type, Thalassemia and Num. Major Blood Vessels are the top 3 most important predictors
+
+#AUC of each predictor
+roc <- filterVarImp(x = heart_train[, -ncol(heart_train)], y = heart_train$Condition)
+head(roc)
+
+
+```
+
