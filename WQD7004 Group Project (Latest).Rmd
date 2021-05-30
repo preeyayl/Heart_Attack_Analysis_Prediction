@@ -336,8 +336,8 @@ So far, a few important points has been observed.
 
 * Resting electrocardiographic (ECG) results : 
 
-1. For values 0 and 1, The ECG count is almost the same.
-2. In comparison with value 0 and 1, it is nearly neglecable for value 2.
+1. For values 0 and 2, The ECG count is almost the same.
+2. In comparison with value 0 and 2, it is nearly neglecable for value 1.
 
 **details for _Resting ECG_** : 
 
